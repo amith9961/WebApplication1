@@ -1,5 +1,6 @@
 using HotChocolate;
 using HotChocolate.Data;
+using HotChocolate.Types;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.HttpsPolicy;
@@ -31,13 +32,16 @@ namespace WebApplication1
             services.AddRazorPages();
             //services.AddDbContext<DbContext, postgresContext>();
             services.AddPooledDbContextFactory<postgresContext>(p => p.UseNpgsql("User ID=postgres;Password=postgrespassword;Host=localhost;Port=5432;Database=postgres;"));
-           // services.AddDbContext<postgresContext>(options => options.UseNpgsql("User ID=postgres;Password=postgrespassword;Host=localhost;Port=5432;Database=postgres;"));
+            // services.AddDbContext<postgresContext>(options => options.UseNpgsql("User ID=postgres;Password=postgrespassword;Host=localhost;Port=5432;Database=postgres;"));
             services
                 .AddGraphQLServer()
                 .RegisterDbContext<postgresContext>(DbContextKind.Pooled)
-                .AddQueryType<Query>()
-                .AddMutationType<Mutation>()
-                .AddFiltering();
+                .AddQueryType()
+                .AddMutationType()
+                .AddTypeExtension<ArticleQuery>()
+                .AddTypeExtension<ArticleMutation>()
+                .AddFiltering()
+                .AddSorting();
             services.AddScoped<IPostgreSqlDatabaseConnectionFactory, PostgreSqlDatabaseConnectionFactory>();
             //services.AddScoped<IGetRepository, GetRepository>();
         }
@@ -73,32 +77,35 @@ namespace WebApplication1
             });
         }
     }
-    public class Query
+    [ExtendObjectType(OperationTypeNames.Query)]
+    public class ArticleQuery
     {
         //IGetRepository getRepository;
 
-        public Query()
+        public ArticleQuery()
         {
             //this.getRepository = getRepository;
         }
 
         [UseDbContext(typeof(postgresContext))]
         [UseFiltering]
-        public IQueryable<Article> GetArticles(postgresContext dbContext)
+        public IQueryable<Article> GetArticles([ScopedService] postgresContext dbContext)
         => dbContext.Articles;
-        [UseDbContext(typeof(postgresContext))]
-        [UseFiltering]
-        public IQueryable<ArticleJob> GetArticleJobs(postgresContext dbContext)
-        => dbContext.ArticleJobs;
+        //[UseDbContext(typeof(postgresContext))]
+        //[UseFiltering]
+        //public IQueryable<ArticleJob> GetArticleJobs(postgresContext dbContext)
+        //=> dbContext.ArticleJobs;
     }
-    public class Mutation
+    [ExtendObjectType(OperationTypeNames.Mutation)]
+    public class ArticleMutation
     {
-        public Mutation()
+        public ArticleMutation()
         {
 
         }
         [UseDbContext(typeof(postgresContext))]
-        public async Task<int> ArticleMutation(postgresContext dbContext, Article article)
+        [UseFiltering]
+        public async Task<int> InsertArticle([ScopedService] postgresContext dbContext, Article article)
         {
             dbContext.Articles.Add(article);
             await dbContext.SaveChangesAsync();
